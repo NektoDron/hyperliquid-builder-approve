@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyperliquid Builder Fee Approver</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121932;
+      --panel-2: #182140;
+      --text: #e8ecf6;
+      --muted: #a8b1c7;
+      --accent: #78a6ff;
+      --accent-2: #92ffcf;
+      --danger: #ff8f8f;
+      --border: #2a355f;
+      --ok: #9ef0b8;
+      --warn: #ffd27d;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      background: linear-gradient(180deg, #09101d 0%, #0d1324 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 64px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      line-height: 1.15;
+    }
+    .sub {
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.3fr 0.9fr;
+      gap: 18px;
+    }
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: rgba(18, 25, 50, 0.9);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+      backdrop-filter: blur(6px);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 18px;
+    }
+    .row {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    input, select, button, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+    }
+    input[readonly] {
+      opacity: 0.92;
+    }
+    button {
+      background: linear-gradient(135deg, var(--accent), #6f8cff);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.06s ease, opacity 0.2s ease;
+    }
+    button:hover { opacity: 0.95; }
+    button:active { transform: translateY(1px); }
+    button.secondary {
+      background: #25315d;
+      border: 1px solid var(--border);
+    }
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .actions > * {
+      flex: 1 1 180px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(255,255,255,0.02);
+      margin: 0 8px 8px 0;
+    }
+    .status {
+      min-height: 46px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .status.ok { border-color: rgba(158,240,184,0.4); color: var(--ok); }
+    .status.warn { border-color: rgba(255,210,125,0.4); color: var(--warn); }
+    .status.err { border-color: rgba(255,143,143,0.4); color: var(--danger); }
+    .mono {
+      font-family: var(--mono);
+      word-break: break-all;
+    }
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+    }
+    details summary {
+      cursor: pointer;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    pre {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d8e2ff;
+    }
+    .small {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 8px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    .kv div:nth-child(odd) { color: var(--muted); }
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    a { color: #9bc2ff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Hyperliquid Builder Fee Approver</h1>
+    <div class="sub">
+      Страница подключает MetaMask или другой injected EVM-кошелёк, подписывает EIP-712 запрос
+      <span class="mono">approveBuilderFee</span> и отправляет его в <span class="mono">https://api.hyperliquid.xyz/exchange</span>.
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Подпись и отправка</h2>
+
+        <div class="row">
+          <label for="walletAddress">Подключённый кошелёк</label>
+          <input id="walletAddress" readonly placeholder="Ещё не подключен" />
+        </div>
+
+        <div class="row">
+          <label for="walletProvider">Обнаруженный кошелёк</label>
+          <select id="walletProvider">
+            <option value="">Поиск кошельков...</option>
+          </select>
+          <div id="walletHint" class="small">Страница ищет injected wallet через EIP-6963 и legacy `window.ethereum`.</div>
+        </div>
+
+        <div class="row">
+          <label for="builder">Builder address</label>
+          <input id="builder" value="0x4bc2a8920a02baae5f1fc583c923e529f70fb5a2" />
+        </div>
+
+        <div class="row">
+          <label for="maxFeeRate">Max fee rate, в процентах строкой</label>
+          <input id="maxFeeRate" value="0.1%" />
+          <div class="small">Hyperliquid docs: для approve передаётся строка процента, например <span class="mono">0.001%</span>.</div>
+        </div>
+
+        <div class="row">
+          <label for="signatureChainId">signatureChainId</label>
+          <input id="signatureChainId" value="0x66eee" />
+          <div class="small">По актуальному официальному Python SDK для user-signed действий используется <span class="mono">0x66eee</span>. Поле оставлено редактируемым на случай изменений.</div>
+        </div>
+
+        <div class="row">
+          <label for="environment">Hyperliquid environment</label>
+          <select id="environment">
+            <option value="Mainnet" selected>Mainnet</option>
+            <option value="Testnet">Testnet</option>
+          </select>
+        </div>
+
+        <div class="actions">
+          <button id="connectBtn">Подключить кошелёк</button>
+          <button id="checkBtn" class="secondary">Проверить текущий approve</button>
+          <button id="approveBtn">Подписать и отправить approve</button>
+        </div>
+
+        <div class="footer-note">
+          Эта страница ничего не делает без явного подтверждения в кошельке. Приватный ключ не запрашивается и не передаётся странице.
+        </div>
+      </section>
+
+      <aside class="card">
+        <h2>Состояние</h2>
+        <div class="pill">Endpoint: <span class="mono">/exchange</span></div>
+        <div class="pill">Info: <span class="mono">/info</span></div>
+        <div class="pill">Тип: <span class="mono">ApproveBuilderFee</span></div>
+        <div id="status" class="status">Готово к подключению кошелька.</div>
+
+        <div class="kv">
+          <div>Nonce</div><div id="nonceView" class="mono">—</div>
+          <div>Response</div><div id="respSummary">—</div>
+        </div>
+      </aside>
+    </div>
+
+    <section class="card" style="margin-top:18px;">
+      <h2>Тело запроса</h2>
+      <details open>
+        <summary>Payload, который будет подписан и отправлен</summary>
+        <pre id="payloadPreview">{}</pre>
+      </details>
+    </section>
+
+    <section class="card" style="margin-top:18px;">
+      <h2>Последний ответ</h2>
+      <details open>
+        <summary>JSON response / error</summary>
+        <pre id="responsePreview">{}</pre>
+      </details>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    const state = {
+      provider: null,
+      signer: null,
+      address: null,
+      lastPayload: null,
+      lastResponse: null,
+      walletProviders: [],
+      selectedWalletProviderId: "",
+      selectedInjectedProvider: null,
+    };
+
+    function setStatus(message, kind = "") {
+      const el = $("status");
+      el.textContent = message;
+      el.className = `status ${kind}`.trim();
+    }
+
+    function setResponse(obj) {
+      state.lastResponse = obj;
+      $("responsePreview").textContent = JSON.stringify(obj, null, 2);
+      if (obj && typeof obj === "object") {
+        const keys = Object.keys(obj);
+        $("respSummary").textContent = keys.length ? keys.join(", ") : "empty object";
+      } else {
+        $("respSummary").textContent = String(obj);
+      }
+    }
+
+    function getProviderLabel(entry) {
+      const name = entry.info && entry.info.name ? entry.info.name : "Injected wallet";
+      const rdns = entry.info && entry.info.rdns ? entry.info.rdns : "";
+      return rdns ? `${name} (${rdns})` : name;
+    }
+
+    function updateWalletPicker() {
+      const select = $("walletProvider");
+      const hint = $("walletHint");
+      const providers = state.walletProviders;
+      const currentValue = state.selectedWalletProviderId;
+
+      if (!providers.length) {
+        select.innerHTML = '<option value="">Кошельки не обнаружены</option>';
+        select.value = "";
+        const fileHint = window.location.protocol === "file:"
+          ? "Скорее всего, расширению запрещён доступ к file://. Включите для MetaMask/Rabby опцию Allow access to file URLs или откройте страницу через http://localhost."
+          : "Проверьте, что страница открыта в браузере с установленным MetaMask/Rabby и кошелёк не заблокирован.";
+        hint.textContent = fileHint;
+        return;
+      }
+
+      select.innerHTML = providers
+        .map((entry) => `<option value="${entry.id}">${getProviderLabel(entry)}</option>`)
+        .join("");
+
+      const preferredValue = providers.some((entry) => entry.id === currentValue)
+        ? currentValue
+        : providers[0].id;
+      select.value = preferredValue;
+      state.selectedWalletProviderId = preferredValue;
+
+      const selected = providers.find((entry) => entry.id === preferredValue) || providers[0];
+      hint.textContent = `Найдено кошельков: ${providers.length}. Текущий выбор: ${getProviderLabel(selected)}.`;
+    }
+
+    function registerWalletProvider(entry) {
+      if (!entry || !entry.provider) {
+        return;
+      }
+      const info = entry.info || {};
+      const fallbackId = info.uuid || info.rdns || info.name || `legacy-${state.walletProviders.length + 1}`;
+      const normalized = {
+        id: fallbackId,
+        info: {
+          uuid: info.uuid || fallbackId,
+          name: info.name || "Injected wallet",
+          rdns: info.rdns || "",
+        },
+        provider: entry.provider,
+      };
+
+      const existingIndex = state.walletProviders.findIndex((item) => item.id === normalized.id);
+      if (existingIndex >= 0) {
+        state.walletProviders[existingIndex] = normalized;
+      } else {
+        state.walletProviders.push(normalized);
+      }
+
+      updateWalletPicker();
+    }
+
+    function discoverLegacyProviders() {
+      if (!window.ethereum) {
+        return;
+      }
+
+      if (Array.isArray(window.ethereum.providers) && window.ethereum.providers.length) {
+        window.ethereum.providers.forEach((provider, idx) => {
+          registerWalletProvider({
+            info: {
+              uuid: `legacy-${idx + 1}`,
+              name:
+                provider.isMetaMask ? "MetaMask" :
+                provider.isRabby ? "Rabby" :
+                provider.isCoinbaseWallet ? "Coinbase Wallet" :
+                `Injected wallet ${idx + 1}`,
+              rdns:
+                provider.isMetaMask ? "io.metamask" :
+                provider.isRabby ? "io.rabby" :
+                provider.isCoinbaseWallet ? "com.coinbase.wallet" :
+                "",
+            },
+            provider,
+          });
+        });
+        return;
+      }
+
+      registerWalletProvider({
+        info: {
+          uuid: "legacy-window-ethereum",
+          name:
+            window.ethereum.isMetaMask ? "MetaMask" :
+            window.ethereum.isRabby ? "Rabby" :
+            window.ethereum.isCoinbaseWallet ? "Coinbase Wallet" :
+            "Injected wallet",
+          rdns:
+            window.ethereum.isMetaMask ? "io.metamask" :
+            window.ethereum.isRabby ? "io.rabby" :
+            window.ethereum.isCoinbaseWallet ? "com.coinbase.wallet" :
+            "",
+        },
+        provider: window.ethereum,
+      });
+    }
+
+    function getSelectedInjectedProvider() {
+      const selected = state.walletProviders.find((entry) => entry.id === state.selectedWalletProviderId);
+      return selected ? selected.provider : null;
+    }
+
+    function attachWalletListeners(injectedProvider) {
+      if (!injectedProvider || !injectedProvider.on) {
+        return;
+      }
+
+      if (state.selectedInjectedProvider && state.selectedInjectedProvider.removeListener) {
+        state.selectedInjectedProvider.removeListener("accountsChanged", onAccountsChanged);
+      }
+
+      state.selectedInjectedProvider = injectedProvider;
+      injectedProvider.on("accountsChanged", onAccountsChanged);
+    }
+
+    function onAccountsChanged(accounts) {
+      state.address = accounts && accounts[0] ? ethers.utils.getAddress(accounts[0]) : null;
+      $("walletAddress").value = state.address || "";
+      setStatus(state.address ? `Аккаунт изменён: ${state.address}` : "Кошелёк отключён.", state.address ? "ok" : "warn");
+    }
+
+    function initWalletDiscovery() {
+      window.addEventListener("eip6963:announceProvider", (event) => {
+        if (!event || !event.detail) {
+          return;
+        }
+        registerWalletProvider(event.detail);
+      });
+
+      try {
+        window.dispatchEvent(new Event("eip6963:requestProvider"));
+      } catch {}
+
+      discoverLegacyProviders();
+
+      setTimeout(() => {
+        discoverLegacyProviders();
+        updateWalletPicker();
+      }, 300);
+    }
+
+    function getAction() {
+      const nonce = Date.now();
+      const action = {
+        type: "approveBuilderFee",
+        hyperliquidChain: $("environment").value,
+        signatureChainId: $("signatureChainId").value.trim(),
+        maxFeeRate: $("maxFeeRate").value.trim(),
+        builder: $("builder").value.trim(),
+        nonce,
+      };
+      $("nonceView").textContent = String(nonce);
+      return action;
+    }
+
+    function getTypedData(action) {
+      const chainIdHex = action.signatureChainId;
+      const chainId = Number.parseInt(chainIdHex, 16);
+      if (!Number.isFinite(chainId)) {
+        throw new Error("Некорректный signatureChainId. Ожидается hex, например 0x66eee.");
+      }
+      return {
+        domain: {
+          name: "HyperliquidSignTransaction",
+          version: "1",
+          chainId,
+          verifyingContract: "0x0000000000000000000000000000000000000000",
+        },
+        types: {
+          HyperliquidTransactionApproveBuilderFee: [
+            { name: "hyperliquidChain", type: "string" },
+            { name: "maxFeeRate", type: "string" },
+            { name: "builder", type: "address" },
+            { name: "nonce", type: "uint64" },
+          ],
+        },
+        primaryType: "HyperliquidTransactionApproveBuilderFee",
+        message: {
+          hyperliquidChain: action.hyperliquidChain,
+          maxFeeRate: action.maxFeeRate,
+          builder: action.builder,
+          nonce: action.nonce,
+        },
+      };
+    }
+
+    function buildPostBody(action, signature) {
+      return {
+        action,
+        nonce: action.nonce,
+        signature,
+      };
+    }
+
+    function previewPayload(payload) {
+      state.lastPayload = payload;
+      $("payloadPreview").textContent = JSON.stringify(payload, null, 2);
+    }
+
+    function validateAddress(address, label) {
+      if (!ethers.utils.isAddress(address)) {
+        throw new Error(`${label}: некорректный адрес`);
+      }
+    }
+
+    async function connectWallet() {
+      const injectedProvider = getSelectedInjectedProvider();
+      if (!injectedProvider) {
+        const fileHint = window.location.protocol === "file:"
+          ? "Injected wallet не найден. Для file://-страниц включите в расширении кошелька Allow access to file URLs или откройте страницу через localhost."
+          : "Injected wallet не найден. Открой страницу в браузере с MetaMask, Rabby или другим EVM-кошельком.";
+        throw new Error(fileHint);
+      }
+      await injectedProvider.request({ method: "eth_requestAccounts" });
+      state.provider = new ethers.providers.Web3Provider(injectedProvider, "any");
+      state.signer = state.provider.getSigner();
+      state.address = await state.signer.getAddress();
+      attachWalletListeners(injectedProvider);
+      $("walletAddress").value = state.address;
+      setStatus(`Кошелёк подключён: ${state.address}`, "ok");
+    }
+
+    async function checkCurrentApproval() {
+      if (!state.address) {
+        await connectWallet();
+      }
+      const builder = $("builder").value.trim();
+      validateAddress(builder, "Builder");
+      validateAddress(state.address, "User");
+      setStatus("Проверяю текущее значение maxBuilderFee...", "warn");
+
+      const res = await fetch("https://api.hyperliquid.xyz/info", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "maxBuilderFee",
+          user: state.address,
+          builder,
+        }),
+      });
+
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = text; }
+      setResponse(data);
+
+      if (!res.ok) {
+        setStatus(`Ошибка info endpoint: HTTP ${res.status}`, "err");
+        return;
+      }
+
+      const parsed = typeof data === "number" ? data : Number(data);
+      if (Number.isFinite(parsed)) {
+        setStatus(`Текущее одобренное значение: ${parsed} deci-bps. Если 0, approve ещё не выставлен.`, "ok");
+      } else {
+        setStatus("Запрос выполнен, но ответ не удалось интерпретировать как число. См. JSON ниже.", "warn");
+      }
+    }
+
+    async function approveBuilderFee() {
+      try {
+        if (!state.address) {
+          await connectWallet();
+        }
+        const action = getAction();
+        validateAddress(action.builder, "Builder");
+
+        const typedData = getTypedData(action);
+        const preview = {
+          typedData,
+          postBodyTemplate: {
+            action,
+            nonce: action.nonce,
+            signature: { r: "0x...", s: "0x...", v: 27 }
+          }
+        };
+        previewPayload(preview);
+        setStatus("Ожидаю подпись typed data в кошельке...", "warn");
+
+        const signatureHex = await state.signer._signTypedData(
+          typedData.domain,
+          typedData.types,
+          typedData.message
+        );
+        const split = ethers.utils.splitSignature(signatureHex);
+        const signature = { r: split.r, s: split.s, v: split.v };
+        const postBody = buildPostBody(action, signature);
+        previewPayload(postBody);
+
+        setStatus("Подпись получена. Отправляю approveBuilderFee в Hyperliquid...", "warn");
+        const res = await fetch("https://api.hyperliquid.xyz/exchange", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(postBody),
+        });
+
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = text; }
+        setResponse(data);
+
+        if (!res.ok) {
+          setStatus(`HTTP ${res.status}. Запрос отклонён. Смотри тело ответа ниже.`, "err");
+          return;
+        }
+
+        const normalized = JSON.stringify(data).toLowerCase();
+        if (normalized.includes("error") || normalized.includes("failed")) {
+          setStatus("Hyperliquid ответил ошибкой логического уровня. Проверь JSON ниже.", "err");
+          return;
+        }
+
+        setStatus("Approve отправлен успешно. Проверь /builderCodes и запрос maxBuilderFee ещё раз.", "ok");
+      } catch (err) {
+        console.error(err);
+        setResponse({ error: err.message || String(err) });
+        if ((err.message || "").includes("User rejected") || (err.code === 4001)) {
+          setStatus("Подпись отклонена пользователем в кошельке.", "warn");
+        } else {
+          setStatus(err.message || String(err), "err");
+        }
+      }
+    }
+
+    function refreshPreview() {
+      try {
+        const action = getAction();
+        const typedData = getTypedData(action);
+        previewPayload({ typedData });
+      } catch (err) {
+        previewPayload({ error: err.message || String(err) });
+      }
+    }
+
+    $("connectBtn").addEventListener("click", async () => {
+      try {
+        await connectWallet();
+      } catch (err) {
+        setResponse({ error: err.message || String(err) });
+        setStatus(err.message || String(err), "err");
+      }
+    });
+
+    $("checkBtn").addEventListener("click", async () => {
+      try {
+        await checkCurrentApproval();
+      } catch (err) {
+        setResponse({ error: err.message || String(err) });
+        setStatus(err.message || String(err), "err");
+      }
+    });
+
+    $("approveBtn").addEventListener("click", approveBuilderFee);
+    $("walletProvider").addEventListener("change", (event) => {
+      state.selectedWalletProviderId = event.target.value;
+      const selected = state.walletProviders.find((entry) => entry.id === state.selectedWalletProviderId);
+      if (selected) {
+        $("walletHint").textContent = `Выбран кошелёк: ${getProviderLabel(selected)}.`;
+      }
+    });
+
+    ["builder", "maxFeeRate", "signatureChainId", "environment"].forEach((id) => {
+      $(id).addEventListener("input", refreshPreview);
+      $(id).addEventListener("change", refreshPreview);
+    });
+
+    initWalletDiscovery();
+    refreshPreview();
+  </script>
+</body>
+</html>
