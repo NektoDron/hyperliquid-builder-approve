@@ -224,7 +224,7 @@
         <div class="row">
           <label for="signatureChainId">signatureChainId</label>
           <input id="signatureChainId" value="0x66eee" />
-          <div class="small">По актуальному официальному Python SDK для user-signed действий используется <span class="mono">0x66eee</span>. Поле оставлено редактируемым на случай изменений.</div>
+          <div id="chainHint" class="small">Для browser wallet это поле должно совпадать с текущим chainId кошелька. После подключения заполним его автоматически из <span class="mono">eth_chainId</span>.</div>
         </div>
 
         <div class="row">
@@ -285,6 +285,7 @@
       provider: null,
       signer: null,
       address: null,
+      currentChainIdHex: null,
       lastPayload: null,
       lastResponse: null,
       walletProviders: [],
@@ -307,6 +308,15 @@
       } else {
         $("respSummary").textContent = String(obj);
       }
+    }
+
+    function setSignatureChainIdFromWallet(chainIdHex) {
+      if (!chainIdHex) {
+        return;
+      }
+      state.currentChainIdHex = chainIdHex.toLowerCase();
+      $("signatureChainId").value = state.currentChainIdHex;
+      $("chainHint").textContent = `Текущий chainId кошелька: ${state.currentChainIdHex}. Для подписи используем его же, иначе wallet отклонит EIP-712.`;
     }
 
     function getProviderLabel(entry) {
@@ -428,16 +438,24 @@
 
       if (state.selectedInjectedProvider && state.selectedInjectedProvider.removeListener) {
         state.selectedInjectedProvider.removeListener("accountsChanged", onAccountsChanged);
+        state.selectedInjectedProvider.removeListener("chainChanged", onChainChanged);
       }
 
       state.selectedInjectedProvider = injectedProvider;
       injectedProvider.on("accountsChanged", onAccountsChanged);
+      injectedProvider.on("chainChanged", onChainChanged);
     }
 
     function onAccountsChanged(accounts) {
       state.address = accounts && accounts[0] ? ethers.utils.getAddress(accounts[0]) : null;
       $("walletAddress").value = state.address || "";
       setStatus(state.address ? `Аккаунт изменён: ${state.address}` : "Кошелёк отключён.", state.address ? "ok" : "warn");
+    }
+
+    function onChainChanged(chainIdHex) {
+      setSignatureChainIdFromWallet(chainIdHex);
+      setStatus(`Сеть кошелька изменена: ${state.currentChainIdHex}`, "warn");
+      refreshPreview();
     }
 
     function initWalletDiscovery() {
@@ -478,7 +496,10 @@
       const chainIdHex = action.signatureChainId;
       const chainId = Number.parseInt(chainIdHex, 16);
       if (!Number.isFinite(chainId)) {
-        throw new Error("Некорректный signatureChainId. Ожидается hex, например 0x66eee.");
+        throw new Error("Некорректный signatureChainId. Ожидается hex, например 0xa4b1.");
+      }
+      if (state.currentChainIdHex && chainIdHex.toLowerCase() !== state.currentChainIdHex) {
+        throw new Error(`signatureChainId (${chainIdHex}) должен совпадать с текущей сетью кошелька (${state.currentChainIdHex}).`);
       }
       return {
         domain: {
@@ -536,12 +557,14 @@
       if (!Array.isArray(accounts) || !accounts.length) {
         throw new Error("Кошелёк не отдал ни одного аккаунта. Разблокируйте кошелёк, создайте или импортируйте хотя бы один account и разрешите доступ сайту.");
       }
+      const chainIdHex = await injectedProvider.request({ method: "eth_chainId" });
+      setSignatureChainIdFromWallet(chainIdHex);
       state.provider = new ethers.providers.Web3Provider(injectedProvider, "any");
       state.signer = state.provider.getSigner();
       state.address = ethers.utils.getAddress(accounts[0]);
       attachWalletListeners(injectedProvider);
       $("walletAddress").value = state.address;
-      setStatus(`Кошелёк подключён: ${state.address}`, "ok");
+      setStatus(`Кошелёк подключён: ${state.address}. Сеть: ${state.currentChainIdHex}`, "ok");
     }
 
     async function checkCurrentApproval() {
