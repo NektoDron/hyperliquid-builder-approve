@@ -532,10 +532,13 @@
           : "Injected wallet не найден. Открой страницу в браузере с MetaMask, Rabby или другим EVM-кошельком.";
         throw new Error(fileHint);
       }
-      await injectedProvider.request({ method: "eth_requestAccounts" });
+      const accounts = await injectedProvider.request({ method: "eth_requestAccounts" });
+      if (!Array.isArray(accounts) || !accounts.length) {
+        throw new Error("Кошелёк не отдал ни одного аккаунта. Разблокируйте кошелёк, создайте или импортируйте хотя бы один account и разрешите доступ сайту.");
+      }
       state.provider = new ethers.providers.Web3Provider(injectedProvider, "any");
       state.signer = state.provider.getSigner();
-      state.address = await state.signer.getAddress();
+      state.address = ethers.utils.getAddress(accounts[0]);
       attachWalletListeners(injectedProvider);
       $("walletAddress").value = state.address;
       setStatus(`Кошелёк подключён: ${state.address}`, "ok");
