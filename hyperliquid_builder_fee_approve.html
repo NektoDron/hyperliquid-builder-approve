@@ -593,7 +593,7 @@
 
       const parsed = typeof data === "number" ? data : Number(data);
       if (Number.isFinite(parsed)) {
-        setStatus(`Текущее одобренное значение: ${parsed} deci-bps (${formatPercentFromDeciBps(parsed)}). Если 0, approve ещё не выставлен.`, "ok");
+        setStatus(`Текущее одобренное значение: ${formatPercentFromDeciBps(parsed)}. Если 0%, approve ещё не выставлен.`, "ok");
       } else {
         setStatus("Запрос выполнен, но ответ не удалось интерпретировать как число. См. JSON ниже.", "warn");
       }
