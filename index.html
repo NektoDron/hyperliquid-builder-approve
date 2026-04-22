@@ -509,14 +509,20 @@
           verifyingContract: "0x0000000000000000000000000000000000000000",
         },
         types: {
-          HyperliquidTransactionApproveBuilderFee: [
+          "HyperliquidTransaction:ApproveBuilderFee": [
             { name: "hyperliquidChain", type: "string" },
             { name: "maxFeeRate", type: "string" },
             { name: "builder", type: "address" },
             { name: "nonce", type: "uint64" },
           ],
+          EIP712Domain: [
+            { name: "name", type: "string" },
+            { name: "version", type: "string" },
+            { name: "chainId", type: "uint256" },
+            { name: "verifyingContract", type: "address" },
+          ],
         },
-        primaryType: "HyperliquidTransactionApproveBuilderFee",
+        primaryType: "HyperliquidTransaction:ApproveBuilderFee",
         message: {
           hyperliquidChain: action.hyperliquidChain,
           maxFeeRate: action.maxFeeRate,
@@ -543,6 +549,11 @@
       if (!ethers.utils.isAddress(address)) {
         throw new Error(`${label}: некорректный адрес`);
       }
+    }
+
+    function formatPercentFromDeciBps(value) {
+      const percent = Number(value) / 1000;
+      return `${percent.toLocaleString("en-US", { maximumFractionDigits: 6 })}%`;
     }
 
     async function connectWallet() {
@@ -598,7 +609,7 @@
 
       const parsed = typeof data === "number" ? data : Number(data);
       if (Number.isFinite(parsed)) {
-        setStatus(`Текущее одобренное значение: ${parsed} deci-bps. Если 0, approve ещё не выставлен.`, "ok");
+        setStatus(`Текущее одобренное значение: ${parsed} deci-bps (${formatPercentFromDeciBps(parsed)}). Если 0, approve ещё не выставлен.`, "ok");
       } else {
         setStatus("Запрос выполнен, но ответ не удалось интерпретировать как число. См. JSON ниже.", "warn");
       }
