@@ -221,19 +221,7 @@
           <div class="small">Hyperliquid docs: для approve передаётся строка процента, например <span class="mono">0.001%</span>.</div>
         </div>
 
-        <div class="row">
-          <label for="signatureChainId">signatureChainId</label>
-          <input id="signatureChainId" value="0x66eee" />
-          <div id="chainHint" class="small">Для browser wallet это поле должно совпадать с текущим chainId кошелька. После подключения заполним его автоматически из <span class="mono">eth_chainId</span>.</div>
-        </div>
-
-        <div class="row">
-          <label for="environment">Hyperliquid environment</label>
-          <select id="environment">
-            <option value="Mainnet" selected>Mainnet</option>
-            <option value="Testnet">Testnet</option>
-          </select>
-        </div>
+        <div id="chainHint" class="small" style="margin-top:-2px; margin-bottom:14px;">Для browser wallet chain id берётся автоматически из текущей сети кошелька. Hyperliquid environment зафиксирован как <span class="mono">Mainnet</span>.</div>
 
         <div class="actions">
           <button id="connectBtn">Подключить кошелёк</button>
@@ -315,7 +303,6 @@
         return;
       }
       state.currentChainIdHex = chainIdHex.toLowerCase();
-      $("signatureChainId").value = state.currentChainIdHex;
       $("chainHint").textContent = `Текущий chainId кошелька: ${state.currentChainIdHex}. Для подписи используем его же, иначе wallet отклонит EIP-712.`;
     }
 
@@ -482,8 +469,8 @@
       const nonce = Date.now();
       const action = {
         type: "approveBuilderFee",
-        hyperliquidChain: $("environment").value,
-        signatureChainId: $("signatureChainId").value.trim(),
+        hyperliquidChain: "Mainnet",
+        signatureChainId: state.currentChainIdHex,
         maxFeeRate: $("maxFeeRate").value.trim(),
         builder: $("builder").value.trim(),
         nonce,
@@ -494,6 +481,9 @@
 
     function getTypedData(action) {
       const chainIdHex = action.signatureChainId;
+      if (!chainIdHex) {
+        throw new Error("Сначала подключите кошелёк, чтобы получить текущий chainId.");
+      }
       const chainId = Number.parseInt(chainIdHex, 16);
       if (!Number.isFinite(chainId)) {
         throw new Error("Некорректный signatureChainId. Ожидается hex, например 0xa4b1.");
@@ -711,7 +701,7 @@
       }
     });
 
-    ["builder", "maxFeeRate", "signatureChainId", "environment"].forEach((id) => {
+    ["builder", "maxFeeRate"].forEach((id) => {
       $(id).addEventListener("input", refreshPreview);
       $(id).addEventListener("change", refreshPreview);
     });
